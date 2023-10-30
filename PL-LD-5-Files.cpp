@@ -76,13 +76,6 @@ void processLogFile(const char* logFilePath, const char* outputFilePath) {
     fclose(outputFile);
 }
 
-/**
- * The main function to handle command-line arguments and initiate log processing.
- *
- * @param argc The number of command-line arguments.
- * @param argv An array of command-line argument strings.
- * @return 0 on successful execution, 1 on error.
- */
 int main(int argc, char* argv[]) {
     if (argc != 3) {
         printf("Usage: %s <log_file> <output_file>\n", argv[0]);
