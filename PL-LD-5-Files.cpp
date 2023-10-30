@@ -1,84 +1,98 @@
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
+#define _CRT_SECURE_NO_WARNINGS
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-constexpr int MAX_LOG_ENTRY_LENGTH = 1024;
-constexpr int MAX_IP_LENGTH = 16; // IPv4 addresses have a maximum length of 15 characters
+#define MAX_LINE_LENGTH 1024
+#define MAX_IP_LENGTH 16
+
+// Structure to represent log entries
+typedef struct {
+    char ip[MAX_IP_LENGTH];
+    int numFiles;
+    long totalSize;
+} LogEntry;
 
 /**
- * Extracts and processes IP addresses from an Apache web server log file.
+ * Processes a log file, aggregates data, and writes the results to an output file.
  *
- * @param inputFilePath Path to the input log file.
- * @param outputFilePath Path to the output file for IP addresses and their stats.
+ * @param logFilePath The path to the input log file.
+ * @param outputFilePath The path to the output file where results will be written.
  */
-void processApacheLog(const char* inputFilePath, const char* outputFilePath) {
-    // Open input log file
-    FILE* inputFile;
-    if (fopen_s(&inputFile, inputFilePath, "r") != 0) {
-        perror("Error opening input file");
-        return;
+void processLogFile(const char* logFilePath, const char* outputFilePath) {
+    FILE* logFile = fopen(logFilePath, "r");
+    if (logFile == NULL) {
+        perror("Error opening log file");
+        exit(1);
     }
 
-    // Open output file for writing IP addresses and their stats
-    FILE* outputFile;
-    if (fopen_s(&outputFile, outputFilePath, "w") != 0) {
+    FILE* outputFile = fopen(outputFilePath, "w");
+    if (outputFile == NULL) {
         perror("Error opening output file");
-        fclose(inputFile);
-        return;
+        fclose(logFile);
+        exit(1);
     }
 
-    char line[MAX_LOG_ENTRY_LENGTH];
-    char ipAddress[MAX_IP_LENGTH];
-    char previousIp[MAX_IP_LENGTH] = "";
+    LogEntry* entries = NULL;
+    int numEntries = 0;
+    const char* delimiter = " ";
 
-    int numFiles = 0;
-    long long totalSize = 0;
+    char line[MAX_LINE_LENGTH];
+    while (fgets(line, sizeof(line), logFile)) {
+        char* ip = strtok(line, delimiter);
+        char* unused1 = strtok(NULL, delimiter); // Skip the unused fields
+        char* unused2 = strtok(NULL, delimiter);
+        char* unused3 = strtok(NULL, delimiter);
+        char* totalSizeStr = strtok(NULL, delimiter);
 
-    while (fgets(line, MAX_LOG_ENTRY_LENGTH, inputFile) != nullptr) {
-        if (sscanf_s(line, "%*s %*s %*s [%*[^]]] \"%*s %*s %*s\" %s", ipAddress, (unsigned)_countof(ipAddress)) == 1) {
-            if (strcmp(previousIp, ipAddress) == 0) {
-                // Same IP address as the previous entry
-                numFiles++;
-            }
-            else {
-                // New IP address encountered
-                if (numFiles > 0) {
-                    // Write IP address and its stats to the output file
-                    fprintf(outputFile, "IP: %s, Files Requested: %d, Total Size: %lld bytes\n", previousIp, numFiles, totalSize);
+        if (ip && totalSizeStr) {
+            int found = 0;
+            for (int i = 0; i < numEntries; i++) {
+                if (strcmp(entries[i].ip, ip) == 0) {
+                    entries[i].numFiles++;
+                    entries[i].totalSize += atoi(totalSizeStr);
+                    found = 1;
+                    break;
                 }
-
-                // Reset counters for the new IP address
-                strcpy_s(previousIp, _countof(previousIp), ipAddress);
-                numFiles = 1;
-                totalSize = 0;
             }
 
-            long long fileSize;
-            if (sscanf_s(line, "%*s %*s %*s [%*[^]]] \"%*s %*s %*s\" %*s %*s %*s %lld", &fileSize) == 1) {
-                totalSize += fileSize;
+            if (!found) {
+                numEntries++;
+                entries = (LogEntry*)realloc(entries, numEntries * sizeof(LogEntry));
+                strncpy(entries[numEntries - 1].ip, ip, MAX_IP_LENGTH);
+                entries[numEntries - 1].numFiles = 1;
+                entries[numEntries - 1].totalSize = atoi(totalSizeStr);
             }
         }
     }
 
-    // Write the last IP address and its stats
-    if (numFiles > 0) {
-        fprintf(outputFile, "IP: %s, Files Requested: %d, Total Size: %lld bytes\n", previousIp, numFiles, totalSize);
+    for (int i = 0; i < numEntries; i++) {
+        fprintf(outputFile, "IP: %s, Files Requested: %d, Total Size: %ld\n",
+            entries[i].ip, entries[i].numFiles, entries[i].totalSize);
     }
 
-    fclose(inputFile);
+    free(entries);
+    fclose(logFile);
     fclose(outputFile);
 }
 
+/**
+ * The main function to handle command-line arguments and initiate log processing.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of command-line argument strings.
+ * @return 0 on successful execution, 1 on error.
+ */
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        printf("Usage: %s <inputLogFile> <outputFile>\n", argv[0]);
+        printf("Usage: %s <log_file> <output_file>\n", argv[0]);
         return 1;
     }
 
-    const char* inputFilePath = argv[1];
+    const char* logFilePath = argv[1];
     const char* outputFilePath = argv[2];
 
-    processApacheLog(inputFilePath, outputFilePath);
+    processLogFile(logFilePath, outputFilePath);
 
     return 0;
 }
