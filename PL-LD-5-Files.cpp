@@ -33,44 +33,56 @@ void processLogFile(const char* logFilePath, const char* outputFilePath) {
         exit(1);
     }
 
+    // Array to store log entries
     LogEntry* entries = NULL;
     int numEntries = 0;
     const char* delimiter = " ";
 
+    // Buffer to store each line of the log file
     char line[MAX_LINE_LENGTH];
+    // Read each line of the log file
     while (fgets(line, sizeof(line), logFile)) {
+        // Tokenize each line
         char* ip = strtok(line, delimiter);
         char* unused1 = strtok(NULL, delimiter); // Skip the unused fields
         char* unused2 = strtok(NULL, delimiter);
         char* unused3 = strtok(NULL, delimiter);
         char* totalSizeStr = strtok(NULL, delimiter);
 
+        // Check if both IP address and total size are present
         if (ip && totalSizeStr) {
-            int found = 0;
+            // Flag to check if the IP address is already in the entries array
+            int foundInEntries = 0;
             for (int i = 0; i < numEntries; i++) {
                 if (strcmp(entries[i].ip, ip) == 0) {
+                    // Update counts for the existing entry
                     entries[i].numFiles++;
                     entries[i].totalSize += atoi(totalSizeStr);
-                    found = 1;
+                    foundInEntries = 1;
                     break;
                 }
             }
 
-            if (!found) {
+            if (!foundInEntries) {
                 numEntries++;
+                // Resize the entries array to accommodate the new entry
                 entries = (LogEntry*)realloc(entries, numEntries * sizeof(LogEntry));
+                // Copy the IP address to the new entry
                 strncpy(entries[numEntries - 1].ip, ip, MAX_IP_LENGTH);
+                // Initialize counts for the new entry
                 entries[numEntries - 1].numFiles = 1;
                 entries[numEntries - 1].totalSize = atoi(totalSizeStr);
             }
         }
     }
 
+    // Write the entries to the output file
     for (int i = 0; i < numEntries; i++) {
         fprintf(outputFile, "IP: %s, Files Requested: %d, Total Size: %ld\n",
             entries[i].ip, entries[i].numFiles, entries[i].totalSize);
     }
 
+    // Free dynamically allocated memory for entries
     free(entries);
     fclose(logFile);
     fclose(outputFile);
